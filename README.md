@@ -2,6 +2,10 @@
 Update, Upgrade, setup app
 
 ```
-rpm-ostree rebase ostree-unverified-registry:ghcr.io/victorytek/vauxite:latest
+git clone https://github.com/VictoryTek/Maintenance-Machine
+cd Maintenance-Machine
+chmod +x *.py
+
+python3 main.py
 
 ```
