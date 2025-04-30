@@ -13,14 +13,16 @@ def update_system(distro):
         elif distro == "nixos":
             subprocess.run(["sudo", "nix-channel", "--update"])
             subprocess.run(["sudo", "nixos-rebuild", "switch"])
-        elif distro in ["bazzite", "vauxite"]:
-            subprocess.run(["topgrade", "--yes"])
         elif distro == "debian":
             subprocess.run(["sudo", "apt", "update"])
             subprocess.run(["sudo", "apt", "upgrade", "-y"])
+        elif distro == "nobara":
+            subprocess.run(["nobara-sync", "cli"])
+        elif distro in ["bazzite", "vauxite"]:
+            subprocess.run(["topgrade", "--yes"])
         else:
             raise Exception(f"Unsupported distribution: {distro}")
-        
+
         log_action("System update completed")
         save_last_action("Update System")
         if reboot_after:
@@ -31,7 +33,6 @@ def update_system(distro):
 
 def version_upgrade(distro):
     log_action(f"Starting version upgrade for {distro}")
-    reboot_after = input("\nReboot after upgrade? [y/N]: ").strip().lower() == "y"
     try:
         if distro == "fedora":
             _fedora_upgrade()
@@ -39,16 +40,14 @@ def version_upgrade(distro):
             _nixos_upgrade()
         elif distro == "debian":
             _debian_upgrade()
+        elif distro == "nobara":
+            subprocess.run(["nobara-sync", "cli"])
+            save_last_action("Version Upgrade")
         elif distro in ["bazzite", "vauxite"]:
             print(f"{distro.capitalize()} upgrades managed automatically.")
             log_action(f"{distro.capitalize()} upgrade skipped (automatic)")
         else:
             raise Exception(f"Unsupported distribution: {distro}")
-
-        log_action("Version upgrade completed")
-        save_last_action("Version Upgrade")
-        if reboot_after:
-            subprocess.run(["sudo", "reboot"])
     except Exception as e:
         log_action(f"Version upgrade failed: {e}", level="error")
         print(f"⚠️ Version upgrade failed: {e}")

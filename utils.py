@@ -27,20 +27,23 @@ def inhibit_sleep():
 def detect_distro():
     try:
         with open("/etc/os-release") as f:
-            data = f.read().lower()
-            if "vauxite" in data:
-                return "vauxite"
-            if "bazzite" in data:
-                return "bazzite"
-            if "fedora" in data:
+            os_info = f.read().lower()
+            if "nobara" in os_info:
+                return "nobara"
+            elif "fedora" in os_info:
                 return "fedora"
-            if "debian" in data:
-                return "debian"
-            if "nixos" in data:
+            elif "nixos" in os_info:
                 return "nixos"
-    except FileNotFoundError:
+            elif "debian" in os_info:
+                return "debian"
+            elif "bazzite" in os_info:
+                return "bazzite"
+            elif "vauxite" in os_info:
+                return "vauxite"
+    except:
         pass
     return "unknown"
+
 
 def get_fedora_version():
     try:
