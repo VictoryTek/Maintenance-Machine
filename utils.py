@@ -2,7 +2,6 @@ import subprocess
 import logging
 import os
 import re
-import ast
 import shutil
 
 LAST_ACTION_FILE = os.path.expanduser("~/.maintenance_tool_last_action")
@@ -43,7 +42,7 @@ def inhibit_sleep():
         print("🔒 Automatic screen lock re-enabled.")
 
     def toggle_caffeine(enable=True):
-        action = "Toggle" if enable else "Toggle"  # No direct "disable", just toggle
+        action = "Toggle"  # Caffeine only supports Toggle
         try:
             subprocess.run([
                 "gdbus", "call", "--session",
@@ -51,7 +50,7 @@ def inhibit_sleep():
                 "--object-path", "/org/gnome/Shell/Extensions/Caffeine",
                 "--method", f"org.gnome.Shell.Extensions.Caffeine.{action}"
             ], check=True)
-            print(f"☕ Caffeine {'enabled' if enable else 'disabled'}.")
+            print(f"☕ Caffeine toggled.")
             return True
         except subprocess.CalledProcessError as e:
             print(f"⚠️ Failed to toggle Caffeine: {e}")
@@ -91,7 +90,7 @@ def detect_distro():
                 return "bazzite"
             elif "vauxite" in os_info:
                 return "vauxite"
-    except:
+    except Exception:
         pass
     return "unknown"
 
@@ -99,9 +98,7 @@ def get_distro_version(distro: str) -> str:
     if distro == "nixos":
         try:
             result = subprocess.check_output(["nixos-version"], text=True).strip()
-            # This returns something like: "24.05pre5678.abcd1234"
-            version = result.split()[0]  # Just take the first segment
-            return version
+            return result.split()[0]
         except Exception as e:
             print(f"⚠️ Failed to detect NixOS version: {e}")
             return "Unknown"
@@ -110,9 +107,19 @@ def get_distro_version(distro: str) -> str:
     elif distro == "debian":
         try:
             return subprocess.check_output(["lsb_release", "-r"], text=True).strip().split(":")[1].strip()
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ Failed to detect Debian version: {e}")
             return "Unknown"
     elif distro in ["bazzite", "vauxite", "nobara"]:
         return "Rolling"
     else:
         return "Unknown"
+
+# If you're calling get_fedora_version here, you need to define it.
+def get_fedora_version():
+    try:
+        output = subprocess.check_output(["rpm", "-E", "%fedora"], text=True)
+        return int(output.strip())
+    except Exception as e:
+        print(f"⚠️ Failed to detect Fedora version: {e}")
+        return -1
