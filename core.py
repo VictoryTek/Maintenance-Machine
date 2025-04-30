@@ -66,16 +66,35 @@ def _fedora_upgrade():
         save_last_action("Version Upgrade")
 
 def _nixos_upgrade():
+    import json
     now = datetime.datetime.now()
-    month = now.month
-    version = f"{str(now.year)[2:]}.{'05' if month < 5 or month >= 11 else '11'}"
-    confirm = input(f"Upgrade to NixOS {version}? [y/N]: ").strip().lower()
-    if confirm == "y":
-        subprocess.run(["sudo", "nix-channel", "--remove", "nixos"])
-        subprocess.run(["sudo", "nix-channel", "--add", f"https://channels.nixos.org/nixos-{version}", "nixos"])
-        subprocess.run(["sudo", "nix-channel", "--update"])
-        subprocess.run(["sudo", "nixos-rebuild", "switch"])
-        save_last_action("Version Upgrade")
+    proposed_version = f"{str(now.year)[2:]}.{'05' if now.month < 11 else '11'}"
+
+    try:
+        # Get actual available versions from NixOS channel listings
+        response = urllib.request.urlopen("https://channels.nixos.org/")
+        html = response.read().decode()
+
+        # Extract version directories like nixos-24.11
+        available_versions = re.findall(r'nixos-(\d{2}\.\d{2})/', html)
+        available_versions = sorted(set(available_versions), reverse=True)
+
+        # Use proposed_version only if it exists, else fallback to latest
+        if proposed_version not in available_versions:
+            version = available_versions[0]  # Latest available
+        else:
+            version = proposed_version
+
+        confirm = input(f"Upgrade to NixOS {version}? [y/N]: ").strip().lower()
+        if confirm == "y":
+            subprocess.run(["sudo", "nix-channel", "--remove", "nixos"])
+            subprocess.run(["sudo", "nix-channel", "--add", f"https://channels.nixos.org/nixos-{version}", "nixos"])
+            subprocess.run(["sudo", "nix-channel", "--update"])
+            subprocess.run(["sudo", "nixos-rebuild", "switch"])
+            save_last_action("Version Upgrade")
+    except Exception as e:
+        log_action(f"NixOS upgrade failed: {e}", level="error")
+        print(f"⚠️ NixOS upgrade failed: {e}")
 
 def _debian_upgrade():
     current_codename = subprocess.check_output(["lsb_release", "-c", "-s"], text=True).strip()

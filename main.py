@@ -9,7 +9,8 @@ def main_menu():
             os.system("clear")
             distro = detect_distro()
             last_action = load_last_action()
-            print(f"🔍 Distribution: {distro.capitalize()}")
+            version = get_distro_version(distro)
+            print(f"🔍 Distribution: {distro.capitalize()} {version}")
             if last_action:
                 print(f"✅ Last action: {last_action}")
             print("\n==== Maintenance Menu ====")

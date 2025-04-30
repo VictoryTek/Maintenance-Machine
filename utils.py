@@ -22,7 +22,47 @@ def load_last_action():
     return None
 
 def inhibit_sleep():
-    return subprocess.Popen(["systemd-inhibit", "--what=idle:sleep:shutdown", "--why=Maintenance in progress", "sleep", "infinity"])
+    caffeine_enabled = False
+
+    try:
+        # Check if caffeine extension is installed
+        extensions = subprocess.check_output(["gsettings", "get", "org.gnome.shell", "enabled-extensions"], text=True)
+        if "'caffeine@patapon.info'" in extensions:
+            # Enable caffeine extension
+            subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                            "--object-path", "/org/gnome/Shell/Extensions/Caffeine",
+                            "--method", "org.gnome.Shell.Extensions.Caffeine.SetActive", "true"])
+            caffeine_enabled = True
+            print("☕ Caffeine enabled to prevent sleep.")
+        else:
+            # Backup original value and disable screen lock
+            original_lock = subprocess.check_output([
+                "gsettings", "get", "org.gnome.desktop.screensaver", "lock-enabled"
+            ], text=True).strip()
+            os.environ["GNOME_SCREEN_LOCK_BACKUP"] = original_lock
+            subprocess.run([
+                "gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", "false"
+            ])
+            print("🔒 Screen lock disabled temporarily.")
+    except Exception as e:
+        print(f"⚠️ Failed to inhibit sleep: {e}")
+
+    class Inhibitor:
+        def terminate(self):
+            if caffeine_enabled:
+                subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                                "--object-path", "/org/gnome/Shell/Extensions/Caffeine",
+                                "--method", "org.gnome.Shell.Extensions.Caffeine.SetActive", "false"])
+                print("☕ Caffeine disabled.")
+            else:
+                # Restore previous screen lock setting
+                original = os.environ.get("GNOME_SCREEN_LOCK_BACKUP", "true")
+                subprocess.run([
+                    "gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", original
+                ])
+                print("🔒 Screen lock restored.")
+
+    return Inhibitor()
 
 def detect_distro():
     try:
@@ -44,10 +84,26 @@ def detect_distro():
         pass
     return "unknown"
 
-
-def get_fedora_version():
+def get_distro_version(distro):
     try:
-        with open("/etc/fedora-release") as f:
-            return int(re.search(r"(\d+)", f.read()).group(1))
+        if distro == "fedora":
+            import re
+            with open("/etc/os-release") as f:
+                match = re.search(r'VERSION_ID="?(\d+)"?', f.read())
+                return match.group(1) if match else "Unknown"
+        elif distro == "nixos":
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if line.startswith("VERSION="):
+                        return line.split("=")[1].strip().strip('"')
+        elif distro == "debian":
+            return subprocess.check_output(["lsb_release", "-r", "-s"], text=True).strip()
+        elif distro == "nobara":
+            with open("/etc/nobara-release") as f:
+                return f.read().strip()
+        elif distro in ["bazzite", "vauxite"]:
+            return "rolling"
+        else:
+            return "Unknown"
     except Exception:
-        return 0
+        return "Unknown"
