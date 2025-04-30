@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import ast
+import shutil
 
 LAST_ACTION_FILE = os.path.expanduser("~/.maintenance_tool_last_action")
 LOG_PATH = os.path.expanduser("~/maintenance_tool.log")
@@ -23,83 +24,54 @@ def load_last_action():
     return None
 
 def inhibit_sleep():
-    caffeine_id = "caffeine@patapon.info"
-    caffeine_enabled = False
-    modified_extensions = False
+    fallback_used = False
 
-    try:
-        # Get current extensions
-        current_extensions = subprocess.check_output([
-            "gsettings", "get", "org.gnome.shell", "enabled-extensions"
-        ], text=True).strip()
-
-        # Convert to list
-        extensions_list = ast.literal_eval(current_extensions)
-
-        if caffeine_id in extensions_list:
-            caffeine_enabled = True
-            print("☕ Caffeine already enabled.")
-        else:
-            extensions_list.append(caffeine_id)
-            subprocess.run([
-                "gsettings", "set", "org.gnome.shell", "enabled-extensions", str(extensions_list)
-            ])
-            modified_extensions = True
-            print("☕ Caffeine extension temporarily enabled.")
-
-    except Exception as e:
-        print(f"⚠️ Failed to manage caffeine extension: {e}")
-        # fallback: disable screen lock
-        original_lock = subprocess.check_output([
-            "gsettings", "get", "org.gnome.desktop.screensaver", "lock-enabled"
-        ], text=True).strip()
-        os.environ["GNOME_SCREEN_LOCK_BACKUP"] = original_lock
+    def disable_screen_lock():
         subprocess.run([
-            "gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", "false"
+            "gsettings", "set",
+            "org.gnome.desktop.screensaver",
+            "lock-enabled", "false"
         ])
-        print("🔒 Screen lock disabled temporarily.")
+        print("🔒 Automatic screen lock disabled.")
+
+    def enable_screen_lock():
+        subprocess.run([
+            "gsettings", "set",
+            "org.gnome.desktop.screensaver",
+            "lock-enabled", "true"
+        ])
+        print("🔒 Automatic screen lock re-enabled.")
+
+    def toggle_caffeine(enable=True):
+        action = "Toggle" if enable else "Toggle"  # No direct "disable", just toggle
+        try:
+            subprocess.run([
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell.Extensions.Caffeine",
+                "--object-path", "/org/gnome/Shell/Extensions/Caffeine",
+                "--method", f"org.gnome.Shell.Extensions.Caffeine.{action}"
+            ], check=True)
+            print(f"☕ Caffeine {'enabled' if enable else 'disabled'}.")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ Failed to toggle Caffeine: {e}")
+            return False
+
+    if shutil.which("gdbus"):
+        success = toggle_caffeine(True)
+        if not success:
+            disable_screen_lock()
+            fallback_used = True
+    else:
+        disable_screen_lock()
+        fallback_used = True
 
     class Inhibitor:
         def terminate(self):
-            try:
-                if modified_extensions:
-                    # Remove caffeine from the list
-                    updated = subprocess.check_output([
-                        "gsettings", "get", "org.gnome.shell", "enabled-extensions"
-                    ], text=True).strip()
-                    current = ast.literal_eval(updated)
-                    if caffeine_id in current:
-                        current.remove(caffeine_id)
-                        subprocess.run([
-                            "gsettings", "set", "org.gnome.shell", "enabled-extensions", str(current)
-                        ])
-                        print("☕ Caffeine extension disabled.")
-                elif not caffeine_enabled:
-                    # restore screen lock
-                    original = os.environ.get("GNOME_SCREEN_LOCK_BACKUP", "true")
-                    subprocess.run([
-                        "gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", original
-                    ])
-                    print("🔒 Screen lock restored.")
-            except Exception as e:
-                print(f"⚠️ Failed to restore screen lock or disable caffeine: {e}")
-
-    return Inhibitor()
-
-    class Inhibitor:
-        def terminate(self):
-            if caffeine_enabled:
-                subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
-                                "--object-path", "/org/gnome/Shell/Extensions/Caffeine",
-                                "--method", "org.gnome.Shell.Extensions.Caffeine.SetActive", "false"])
-                print("☕ Caffeine disabled.")
+            if fallback_used:
+                enable_screen_lock()
             else:
-                # Restore previous screen lock setting
-                original = os.environ.get("GNOME_SCREEN_LOCK_BACKUP", "true")
-                subprocess.run([
-                    "gsettings", "set", "org.gnome.desktop.screensaver", "lock-enabled", original
-                ])
-                print("🔒 Screen lock restored.")
+                toggle_caffeine(False)
 
     return Inhibitor()
 
