@@ -95,26 +95,24 @@ def detect_distro():
         pass
     return "unknown"
 
-def get_distro_version(distro):
-    try:
-        if distro == "fedora":
-            import re
-            with open("/etc/os-release") as f:
-                match = re.search(r'VERSION_ID="?(\d+)"?', f.read())
-                return match.group(1) if match else "Unknown"
-        elif distro == "nixos":
-            with open("/etc/os-release") as f:
-                for line in f:
-                    if line.startswith("VERSION="):
-                        return line.split("=")[1].strip().strip('"')
-        elif distro == "debian":
-            return subprocess.check_output(["lsb_release", "-r", "-s"], text=True).strip()
-        elif distro == "nobara":
-            with open("/etc/nobara-release") as f:
-                return f.read().strip()
-        elif distro in ["bazzite", "vauxite"]:
-            return "rolling"
-        else:
+def get_distro_version(distro: str) -> str:
+    if distro == "nixos":
+        try:
+            result = subprocess.check_output(["nixos-version"], text=True).strip()
+            # This returns something like: "24.05pre5678.abcd1234"
+            version = result.split()[0]  # Just take the first segment
+            return version
+        except Exception as e:
+            print(f"⚠️ Failed to detect NixOS version: {e}")
             return "Unknown"
-    except Exception:
+    elif distro == "fedora":
+        return get_fedora_version()
+    elif distro == "debian":
+        try:
+            return subprocess.check_output(["lsb_release", "-r"], text=True).strip().split(":")[1].strip()
+        except Exception:
+            return "Unknown"
+    elif distro in ["bazzite", "vauxite", "nobara"]:
+        return "Rolling"
+    else:
         return "Unknown"
