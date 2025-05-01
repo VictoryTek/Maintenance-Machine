@@ -68,38 +68,23 @@ def _fedora_upgrade():
 
 def _nixos_upgrade():
     try:
-        # Fetch the latest stable NixOS version from the official channels
-        url = "https://channels.nixos.org/"
-        with urllib.request.urlopen(url) as response:
-            html = response.read().decode("utf-8")
-
-        # Extract all 'nixos-YY.MM' entries
-        matches = re.findall(r'nixos-(\d{2}\.\d{2})/', html)
-        if not matches:
-            raise Exception("No stable NixOS versions found.")
-
-        # Sort versions and get the latest
-        latest_version = sorted(matches, key=lambda x: list(map(int, x.split('.'))))[-1]
-        print(f"Latest stable NixOS version detected: {latest_version}")
-
-        # Get current version
         current_version_output = subprocess.check_output(["nixos-version"], text=True).strip()
         current_version = current_version_output.split()[0]
         base_version = current_version.split("pre")[0] if "pre" in current_version else current_version
         print(f"Current NixOS version detected: {base_version}")
 
-        if base_version == latest_version:
-            print("Already on the latest stable release.")
+        target_version = input("Enter the NixOS version you want to upgrade to (e.g., 24.05): ").strip()
+        if not re.match(r"^\d{2}\.\d{2}$", target_version):
+            print("❌ Invalid version format. Use format like '24.05'.")
             return
 
-        confirm = input(f"Upgrade NixOS {base_version} → {latest_version}? [y/N]: ").strip().lower()
+        confirm = input(f"Upgrade NixOS {base_version} → {target_version}? [y/N]: ").strip().lower()
         if confirm != "y":
             print("Upgrade cancelled.")
             return
 
-        # Proceed with upgrade
         subprocess.run(["sudo", "nix-channel", "--remove", "nixos"])
-        subprocess.run(["sudo", "nix-channel", "--add", f"https://channels.nixos.org/nixos-{latest_version}", "nixos"])
+        subprocess.run(["sudo", "nix-channel", "--add", f"https://channels.nixos.org/nixos-{target_version}", "nixos"])
         subprocess.run(["sudo", "nix-channel", "--update"])
         subprocess.run(["sudo", "nixos-rebuild", "switch"])
         save_last_action("Version Upgrade")
