@@ -74,7 +74,7 @@ def _nixos_upgrade():
             html = response.read().decode("utf-8")
 
         # Extract all 'nixos-YY.MM' entries
-        matches = re.findall(r'nixos-(\d{2}\.\d{2})', html)
+        matches = re.findall(r'nixos-(\d{2}\.\d{2})/', html)
         if not matches:
             raise Exception("No stable NixOS versions found.")
 
