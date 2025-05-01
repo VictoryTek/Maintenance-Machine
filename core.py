@@ -83,11 +83,16 @@ def _nixos_upgrade():
             print("Upgrade cancelled.")
             return
 
+        reboot_after = input("Reboot after upgrade? [y/N]: ").strip().lower() == "y"
+
         subprocess.run(["sudo", "nix-channel", "--remove", "nixos"])
         subprocess.run(["sudo", "nix-channel", "--add", f"https://channels.nixos.org/nixos-{target_version}", "nixos"])
         subprocess.run(["sudo", "nix-channel", "--update"])
         subprocess.run(["sudo", "nixos-rebuild", "switch"])
         save_last_action("Version Upgrade")
+
+        if reboot_after:
+            subprocess.run(["sudo", "reboot"])
 
     except Exception as e:
         log_action(f"NixOS upgrade failed: {e}", level="error")
